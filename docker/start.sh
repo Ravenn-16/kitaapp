@@ -57,6 +57,27 @@ stop_services() {
 trap 'stop_services; exit 0' TERM INT
 php-fpm -F &
 php_pid=$!
+# FPM starts asynchronously. Do not expose HTTP to Render's startup probes
+# until the FastCGI listener exists; fail clearly if FPM exits or never binds.
+fpm_ready=false
+for ((attempt=1; attempt<=30; attempt++)); do
+    if ! kill -0 "$php_pid" 2>/dev/null; then
+        echo 'PHP-FPM exited before opening port 9000. Check the FPM errors above.' >&2
+        stop_services
+        exit 1
+    fi
+    if php -r '$socket = @fsockopen("127.0.0.1", 9000, $errno, $error, 0.5); if ($socket === false) { exit(1); } fclose($socket);'; then
+        fpm_ready=true
+        break
+    fi
+    sleep 1
+done
+if [[ "$fpm_ready" != true ]]; then
+    echo 'PHP-FPM did not open port 9000 within the startup deadline.' >&2
+    stop_services
+    exit 1
+fi
+echo 'PHP-FPM listener ready; starting Nginx.'
 nginx -g 'daemon off;' &
 nginx_pid=$!
 # Either server exiting ends the container, allowing Render to restart it.
