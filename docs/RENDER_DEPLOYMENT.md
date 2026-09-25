@@ -1,5 +1,10 @@
 # KITA on Render (Docker + hosted MySQL)
 
+For OTP on Render Free, use the included Resend HTTPS mail driver instead of
+SMTP. See [OTP_EMAIL.md](OTP_EMAIL.md) for the required API key, sender verification,
+Render environment variables and restricted test-recipient setup. The SMTP
+settings below apply only when your hosting plan supports outbound SMTP.
+
 ## Inspected requirements
 
 - `composer.json` requires PHP `^8.2` and Laravel `^12.0`; `composer.lock` locks Laravel **12.67.0**. The image uses **PHP 8.3 FPM**, within all locked production constraints. It does not update Composer packages.
