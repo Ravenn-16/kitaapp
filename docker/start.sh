@@ -31,6 +31,9 @@ fi
 if [[ "${RUN_MIGRATIONS:-false}" == 'true' ]]; then
     artisan migrate --force
 fi
+if [[ "${SEED_DEMO_USERS:-false}" == 'true' ]]; then
+    artisan accounts:seed-demo
+fi
 artisan config:cache
 if ! artisan route:cache; then
     echo 'Route cache unavailable; continuing with uncached routes.' >&2
