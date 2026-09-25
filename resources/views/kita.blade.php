@@ -36,7 +36,7 @@
         <sc-if value="{{ loginError }}"><div class="alert" role="alert">{{ loginError }}</div></sc-if>
         <sc-if value="{{ dataError }}"><div class="alert">Database error: {{ dataError }}</div></sc-if>
         <sc-if value="{{ loginLocked }}"><div class="alert">Account locked after repeated failed attempts. Try again in 30s.</div></sc-if>
-        <button type="submit" class="primary-button" onClick="{{ doLogin }}">Sign In</button>
+        <button type="submit" class="primary-button" disabled="{{ loginPending }}" aria-busy="{{ loginPending }}" onClick="{{ doLogin }}">{{ loginButtonLabel }}</button>
       </form>
     </div>
   </div>
@@ -56,8 +56,8 @@
       <form class="form-stack" onSubmit="{{ verifyOtp }}">
         <input aria-label="Six-digit verification code" class="form-input otp-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="{{ otpCode }}" onChange="{{ onOtpChange }}" placeholder="000000"/>
         <sc-if value="{{ loginError }}"><div class="alert" role="alert">{{ loginError }}</div></sc-if>
-        <button type="submit" class="primary-button">Verify OTP</button>
-        <button type="button" class="link-button" onClick="{{ backToPassword }}">Back to password login</button>
+        <button type="submit" class="primary-button" disabled="{{ loginPending }}" aria-busy="{{ loginPending }}">{{ otpButtonLabel }}</button>
+        <button type="button" class="link-button" disabled="{{ loginPending }}" onClick="{{ backToPassword }}">Back to password login</button>
       </form>
     </div>
   </div>

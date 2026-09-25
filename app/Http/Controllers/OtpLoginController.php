@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class OtpLoginController extends Controller
 {
@@ -47,7 +48,7 @@ class OtpLoginController extends Controller
     {
         $otp = (string) random_int(100000, 999999);
 
-        LoginOtp::query()->create([
+        $record = LoginOtp::query()->create([
             'user_id' => $user->id,
             'email' => $user->email,
             'otp_hash' => Hash::make($otp),
@@ -60,9 +61,16 @@ class OtpLoginController extends Controller
             'pending_login_email' => $user->email,
         ]);
 
-        Mail::raw('Your KITA login OTP is '.$otp.'. It expires in 5 minutes.', function ($message) use ($user): void {
-            $message->to($user->email)->subject('Your KITA login OTP');
-        });
+        try {
+            Mail::raw('Your KITA login OTP is '.$otp.'. It expires in 5 minutes.', function ($message) use ($user): void {
+                $message->to($user->email)->subject('Your KITA login OTP');
+            });
+        } catch (TransportExceptionInterface $exception) {
+            $record->delete();
+            session()->forget(['pending_login_user_id', 'pending_login_email']);
+            \Illuminate\Support\Facades\Log::error('Login OTP delivery failed. Check mail provider connectivity and configuration.');
+            abort(503, 'Unable to send your sign-in code. Please contact your administrator to check email delivery, then try again.');
+        }
 
         return $otp;
     }

@@ -10,6 +10,20 @@ class OtpLoginTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_mail_failure_returns_a_clear_error_without_leaving_a_pending_login(): void
+    {
+        $user = User::factory()->create(['role' => 'manager', 'password' => 'secret123']);
+        \Illuminate\Support\Facades\Mail::shouldReceive('raw')->once()
+            ->andThrow(new \Symfony\Component\Mailer\Exception\TransportException('SMTP unavailable'));
+
+        $this->postJson('/login', ['email' => $user->email, 'password' => 'secret123'])
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'Unable to send your sign-in code. Please contact your administrator to check email delivery, then try again.')
+            ->assertSessionMissing('pending_login_email');
+        $this->assertDatabaseCount('login_otps', 0);
+        $this->assertGuest();
+    }
+
     public function test_email_password_login_preserves_all_role_dashboards(): void
     {
         foreach (['cashier' => 'pos'] as $role => $dashboard) {

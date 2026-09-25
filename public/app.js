@@ -138,7 +138,7 @@ function btn(label,onClick,variant){ const styles={primary:{background:COLORS.br
 class Component extends DCLogic {
   state = {
     data: null,
-    authStep:"login", loginUsername:"", loginPassword:"", otpCode:"", otpEmail:"", loginError:"", loginTries:0, loginLocked:false, pendingRole:null,
+    authStep:"login", loginPending:false, loginUsername:"", loginPassword:"", otpCode:"", otpEmail:"", loginError:"", loginTries:0, loginLocked:false, pendingRole:null,
     role:null, screen:null, toasts:[], sidebarOpen:false,tableViews:{},
     barcodeInput:"", cart:[], scannerConnected:true, manualLookupOpen:false, manualSearch:"",
     seniorPwdOpen:false, seniorForm:{name:"",idNumber:""}, seniorApplied:false, seniorInfo:null, employeeDiscount:false,
@@ -258,7 +258,17 @@ class Component extends DCLogic {
     if(!e.repeat) this.doLogin();
   };
   backToPortalSelect=()=>this.setState({authStep:"login",pendingRole:null,loginUsername:"",loginPassword:"",loginError:""});
-  authPost=(url,payload,method="POST")=>fetch(url,{method,headers:{"Content-Type":"application/json","Accept":"application/json","X-CSRF-TOKEN":(window.KITA_AUTH&&window.KITA_AUTH.csrfToken)||document.querySelector('meta[name="csrf-token"]')?.content||""},credentials:"same-origin",body:JSON.stringify(payload)}).then(async r=>{ const body=await r.json().catch(()=>{ throw new Error("Your session changed. Refresh the page to continue."); }); this.handleSessionResponse(r,body); if(!r.ok){ const msg=(body.errors && Object.values(body.errors)[0] && Object.values(body.errors)[0][0]) || body.message || "Request failed."; const err=new Error(msg); err.status=r.status; err.body=body; throw err; } if(this.state.authStep==='in'&&!url.startsWith('/api/notifications'))this.reloadNotifications(); return body; });
+  authPost=(url,payload,method="POST",signal)=>fetch(url,{method,signal,headers:{"Content-Type":"application/json","Accept":"application/json","X-CSRF-TOKEN":(window.KITA_AUTH&&window.KITA_AUTH.csrfToken)||document.querySelector('meta[name="csrf-token"]')?.content||""},credentials:"same-origin",body:JSON.stringify(payload)}).then(async r=>{ const body=await r.json().catch(()=>{ throw new Error("Your session changed. Refresh the page to continue."); }); this.handleSessionResponse(r,body); if(!r.ok){ const msg=(body.errors && Object.values(body.errors)[0] && Object.values(body.errors)[0][0]) || body.message || "Request failed."; const err=new Error(msg); err.status=r.status; err.body=body; throw err; } if(this.state.authStep==='in'&&!url.startsWith('/api/notifications'))this.reloadNotifications(); return body; });
+  loginPost=async (url,payload)=>{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),30000);
+    try { return await this.authPost(url,payload,"POST",controller.signal); }
+    catch(error){
+      if(error.name==="AbortError") throw new Error("Sign-in timed out. Please try again. If this continues, contact your administrator to check email delivery and server connectivity.");
+      if(error instanceof TypeError) throw new Error("Cannot reach the server. Check your connection and refresh the page before trying again.");
+      throw error;
+    } finally { clearTimeout(timer); }
+  };
   doLogin=e=>{
     e?.preventDefault();
     if(this.loginBusy) return;
@@ -268,11 +278,12 @@ class Component extends DCLogic {
     const password=String(this.state.loginPassword||passwordInput?.value||"");
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!password){ this.setState({loginError:"Enter a valid email address and password."}); return; }
     this.loginBusy=true;
-    this.authPost(window.KITA_AUTH?.loginUrl||"/login",{email,password}).then(res=>{
+    this.setState({loginPending:true,loginError:""});
+    this.loginPost(window.KITA_AUTH?.loginUrl||"/login",{email,password}).then(res=>{
       if(res.csrf_token) window.KITA_AUTH.csrfToken=res.csrf_token;
       if(res.otp_required){ this.setState({authStep:"otp",otpEmail:res.email||email,loginPassword:"",otpCode:"",loginError:""}); return; }
       this.setState({loginPassword:"",loginError:""}); this.enterApp(res.role,res.dashboard,res);
-    }).catch(error=>this.setState({loginError:error.message,loginPassword:""})).finally(()=>{this.loginBusy=false;});
+    }).catch(error=>this.setState({loginError:error.message,loginPassword:""})).finally(()=>{this.loginBusy=false;this.setState({loginPending:false});});
   };
   onOtpChange=e=>this.setState({otpCode:String(e.target.value||"").replace(/\D/g,"").slice(0,6)});
   verifyOtp=e=>{
@@ -280,10 +291,11 @@ class Component extends DCLogic {
     if(this.loginBusy) return;
     if(!/^\d{6}$/.test(this.state.otpCode)){ this.setState({loginError:"Enter the 6-digit OTP sent to your email."}); return; }
     this.loginBusy=true;
-    this.authPost("/otp/verify",{email:this.state.otpEmail,otp:this.state.otpCode}).then(res=>{
+    this.setState({loginPending:true,loginError:""});
+    this.loginPost("/otp/verify",{email:this.state.otpEmail,otp:this.state.otpCode}).then(res=>{
       if(res.csrf_token) window.KITA_AUTH.csrfToken=res.csrf_token;
       this.setState({otpCode:"",loginError:""}); this.enterApp(res.role,res.dashboard,res);
-    }).catch(error=>this.setState({loginError:error.message,otpCode:"",...(error.message==="Your account has been deactivated. Please contact your operator."?{authStep:"login",loginPassword:"",otpEmail:""}:{})})).finally(()=>{this.loginBusy=false;});
+    }).catch(error=>this.setState({loginError:error.message,otpCode:"",...(error.message==="Your account has been deactivated. Please contact your operator."?{authStep:"login",loginPassword:"",otpEmail:""}:{})})).finally(()=>{this.loginBusy=false;this.setState({loginPending:false});});
   };
   backToPassword=()=>this.setState({authStep:"login",otpCode:"",otpEmail:"",loginError:""});
   enterApp=(role,dashboard,user)=>{
@@ -2075,7 +2087,7 @@ class Component extends DCLogic {
       showLogin,showOtp,showApp,loginUsername:s.loginUsername,onUsernameChange:this.onUsernameChange,loginPassword:s.loginPassword,onPasswordChange:this.onPasswordChange,
       otpEmail:s.otpEmail,otpCode:s.otpCode,onOtpChange:this.onOtpChange,verifyOtp:this.verifyOtp,backToPassword:this.backToPassword,
       loginIdentifierLabel:"Email",loginIdentifierPlaceholder:"name@example.com",showPasswordInput:true,
-      loginError:s.loginError,loginLocked:s.loginLocked,doLogin:this.doLogin,onLoginKeyDown:this.onLoginKeyDown,
+      loginPending:s.loginPending,loginButtonLabel:s.loginPending?"Signing in...":"Sign In",otpButtonLabel:s.loginPending?"Verifying...":"Verify OTP",loginError:s.loginError,loginLocked:s.loginLocked,doLogin:this.doLogin,onLoginKeyDown:this.onLoginKeyDown,
       appShellClass:s.sidebarOpen&&s.compactNavigation?"app-shell app-shell--drawer-open":"app-shell",
       navigationInert:s.sidebarOpen&&s.compactNavigation?"":undefined,
       navigationHidden:s.sidebarOpen&&s.compactNavigation?true:undefined,
