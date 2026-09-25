@@ -142,15 +142,15 @@
 
 </x-dc>
 @endverbatim
-<script>window.KITA_DATA_URL = "{{ url('/api/kita-data') }}";</script>
+<script>window.KITA_DATA_URL = "{{ route('kita.data', [], false) }}";</script>
 <script>
 window.KITA_AUTH = {
   loginError: {{ Illuminate\Support\Js::from(session('login_error', '')) }},
   user: {{ Illuminate\Support\Js::from(auth()->user()?->only(['id', 'name', 'email', 'role'])) }},
-  loginUrl: "{{ route('login') }}",
-  transactionUrl: "{{ route('transactions.store') }}",
-  paymongoUrl: "{{ route('paymongo.checkout') }}",
-  logoutUrl: "{{ route('logout') }}",
+  loginUrl: "{{ route('login', [], false) }}",
+  transactionUrl: "{{ route('transactions.store', [], false) }}",
+  paymongoUrl: "{{ route('paymongo.checkout', [], false) }}",
+  logoutUrl: "{{ route('logout', [], false) }}",
   csrfToken: "{{ csrf_token() }}"
 };
 </script>

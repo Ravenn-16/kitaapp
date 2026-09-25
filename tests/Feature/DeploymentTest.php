@@ -6,6 +6,19 @@ use Tests\TestCase;
 
 class DeploymentTest extends TestCase
 {
+    public function test_browser_api_urls_remain_same_origin_without_proxy_configuration(): void
+    {
+        config(['trustedproxy.proxies' => []]);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('window.KITA_DATA_URL = "/api/kita-data"', false)
+            ->assertSee('loginUrl: "/login"', false)
+            ->assertSee('transactionUrl: "/api/transactions"', false)
+            ->assertSee('paymongoUrl: "/api/payments/paymongo/checkout"', false)
+            ->assertSee('logoutUrl: "/logout"', false);
+    }
+
     public function test_health_endpoint_does_not_require_a_database(): void
     {
         config(['database.default' => 'unavailable']);
