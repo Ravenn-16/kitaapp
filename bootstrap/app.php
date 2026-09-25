@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trusted addresses are loaded at request time from config/trustedproxy.php.
+        $middleware->trustProxies(headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO);
         $middleware->web(append: [\App\Http\Middleware\EnsureActiveAccount::class]);
         $middleware->alias([
             'role' => EnsureRole::class,
